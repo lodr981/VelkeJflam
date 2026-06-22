@@ -16,11 +16,21 @@ export async function POST(
 
   const machine = await prisma.machine.findUnique({
     where: { id: params.id },
-    include: { entries: { orderBy: { occurredAt: "desc" } } },
+    include: {
+      entries: { orderBy: { occurredAt: "desc" } },
+      documents: true,
+    },
   });
   if (!machine) {
     return NextResponse.json({ error: "Stroj nenalezen." }, { status: 404 });
   }
+
+  const docs = machine.documents.map((d) => ({
+    fileId: d.fileId,
+    filename: d.filename,
+    kind: d.kind,
+    isImage: d.isImage,
+  }));
 
   const history = Array.isArray(body.history)
     ? body.history
@@ -35,7 +45,7 @@ export async function POST(
     : [];
 
   try {
-    const answer = await askMachineAssistant(machine, history, question);
+    const answer = await askMachineAssistant(machine, history, question, docs);
     return NextResponse.json({ answer });
   } catch (err) {
     console.error("AI chyba:", err);

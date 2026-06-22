@@ -1,6 +1,10 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import { anthropic, AI_MODEL } from "./anthropic";
+import { FILES_BETA } from "./files";
 import type { Machine, LogEntry } from "@prisma/client";
+
+// Model pro dotazy na schémata/výkresy – Opus 4.8 kvůli high-res vision.
+const SCHEMA_MODEL = process.env.ANTHROPIC_SCHEMA_MODEL ?? "claude-opus-4-8";
 
 type MachineForAI = Machine & { entries: LogEntry[] };
 
@@ -58,53 +62,107 @@ Pravidla:
 - U bezpečnostně rizikových úkonů (elektro, tlak, zdvih) připomeň zásady bezpečnosti.
 - Když dává smysl, upozorni na to, "co technika nejspíš čeká" (prediktivní tip podle historie).`;
 
-/** Sestaví zprávy pro Claude API – kontext stroje + historie konverzace. */
-export function buildMessages(
-  context: string,
+export type AttachedDoc = {
+  fileId: string;
+  filename: string;
+  kind: string;
+  isImage: boolean;
+};
+
+const SCHEMA_KEYWORDS =
+  /(sch[ée]ma|sch[ée]mat|hydraul|elektro|v[ýy]kres|ventil|rel[ée]|zapojen|svork|st[ýy]kac|jisti|p[ií]stnic|rozvad|zna[čc]k)/i;
+
+/** Vybere model: dotaz na výkres/schéma → Opus 4.8 (high-res vision), jinak výchozí. */
+export function pickModel(question: string, docs: AttachedDoc[]): string {
+  const hasSchema = docs.some(
+    (d) => d.isImage || d.kind === "hydraulika" || d.kind === "elektro"
+  );
+  if (SCHEMA_KEYWORDS.test(question) || hasSchema) return SCHEMA_MODEL;
+  return AI_MODEL;
+}
+
+/** Připraví obrázky/PDF jako bloky pro zprávu (PDF s citacemi, obrázky jako vision). */
+function docBlocks(docs: AttachedDoc[]): unknown[] {
+  return docs.map((d) =>
+    d.isImage
+      ? { type: "image", source: { type: "file", file_id: d.fileId } }
+      : {
+          type: "document",
+          source: { type: "file", file_id: d.fileId },
+          title: d.filename,
+          citations: { enabled: true },
+        }
+  );
+}
+
+/** Z odpovědi vytáhne text a doplní odkaz na strany manuálu (citace). */
+function extractAnswer(content: Anthropic.Beta.BetaContentBlock[]): string {
+  const parts: string[] = [];
+  const pages = new Set<string>();
+  for (const b of content) {
+    if (b.type === "text") {
+      parts.push(b.text);
+      for (const c of (b as { citations?: unknown[] }).citations ?? []) {
+        const cit = c as {
+          type?: string;
+          start_page_number?: number;
+          end_page_number?: number;
+        };
+        if (cit.type === "page_location" && cit.start_page_number != null) {
+          const a = cit.start_page_number;
+          const z = cit.end_page_number;
+          pages.add(z && z !== a ? `${a}–${z}` : String(a));
+        }
+      }
+    }
+  }
+  let answer = parts.join("\n").trim();
+  if (pages.size) answer += `\n\n📄 Zdroj v manuálu: str. ${[...pages].join(", ")}`;
+  return answer;
+}
+
+/** Zavolá Claude a vrátí textovou odpověď AI údržbáře (s manuály a schématy). */
+export async function askMachineAssistant(
+  machine: MachineForAI,
   history: { role: "user" | "assistant"; content: string }[],
-  question: string
-): Anthropic.MessageParam[] {
-  const first = history.length === 0;
-  const messages: Anthropic.MessageParam[] = [];
-
+  question: string,
+  docs: AttachedDoc[] = []
+): Promise<string> {
+  const context = buildMachineContext(machine);
   const intro = `Kontext o stroji:\n\n${context}\n\n---\n`;
+  const first = history.length === 0;
 
-  if (first) {
-    messages.push({ role: "user", content: `${intro}\nDotaz technika: ${question}` });
-  } else {
-    messages.push({ role: "user", content: `${intro}\n(Navazuje konverzace níže.)` });
+  // První zpráva nese dokumentaci (manuály/schémata) + textový kontext.
+  const firstContent: unknown[] = [
+    ...docBlocks(docs),
+    {
+      type: "text",
+      text: first
+        ? `${intro}\nDotaz technika: ${question}`
+        : `${intro}\n(Navazuje konverzace níže.)`,
+    },
+  ];
+
+  const messages: unknown[] = [{ role: "user", content: firstContent }];
+  if (!first) {
     messages.push({
       role: "assistant",
-      content: "Rozumím, mám historii i parametry stroje. Ptej se.",
+      content: "Rozumím, mám parametry, historii i dokumentaci stroje. Ptej se.",
     });
     for (const m of history) messages.push({ role: m.role, content: m.content });
     messages.push({ role: "user", content: question });
   }
 
-  return messages;
-}
-
-/** Zavolá Claude a vrátí textovou odpověď AI údržbáře. */
-export async function askMachineAssistant(
-  machine: MachineForAI,
-  history: { role: "user" | "assistant"; content: string }[],
-  question: string
-): Promise<string> {
-  const context = buildMachineContext(machine);
-  const messages = buildMessages(context, history, question);
-
-  const res = await anthropic.messages.create({
-    model: AI_MODEL,
+  const res = await anthropic.beta.messages.create({
+    model: pickModel(question, docs),
     max_tokens: 1024,
     system: SYSTEM_PROMPT,
-    messages,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    messages: messages as any,
+    betas: docs.length ? [FILES_BETA] : [],
   });
 
-  return res.content
-    .filter((b): b is Anthropic.TextBlock => b.type === "text")
-    .map((b) => b.text)
-    .join("\n")
-    .trim();
+  return extractAnswer(res.content);
 }
 
 /** Z volného (např. hlasem nadiktovaného) textu udělá strukturovaný záznam poruchy. */

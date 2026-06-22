@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import EntryForm from "./EntryForm";
 import Assistant from "./Assistant";
+import Documents from "./Documents";
 
 export const dynamic = "force-dynamic";
 
@@ -21,7 +22,10 @@ export default async function MachinePage({
 }) {
   const machine = await prisma.machine.findUnique({
     where: { id: params.id },
-    include: { entries: { orderBy: { occurredAt: "desc" } } },
+    include: {
+      entries: { orderBy: { occurredAt: "desc" } },
+      documents: { orderBy: { createdAt: "desc" } },
+    },
   });
 
   if (!machine) notFound();
@@ -48,6 +52,20 @@ export default async function MachinePage({
       </div>
 
       <Assistant machineId={machine.id} machineName={machine.name} />
+
+      <section className="space-y-3">
+        <h2 className="text-lg font-semibold">Dokumentace (manuály a schémata)</h2>
+        <Documents
+          machineId={machine.id}
+          docs={machine.documents.map((d) => ({
+            id: d.id,
+            filename: d.filename,
+            kind: d.kind,
+            isImage: d.isImage,
+            sizeBytes: d.sizeBytes,
+          }))}
+        />
+      </section>
 
       <section className="space-y-3">
         <h2 className="text-lg font-semibold">Zapsat poruchu / zásah</h2>

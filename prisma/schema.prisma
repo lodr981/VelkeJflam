@@ -20,6 +20,22 @@ model Machine {
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
   entries      LogEntry[]
+  documents    Document[]
+}
+
+model Document {
+  id        String   @id @default(cuid())
+  machineId String
+  machine   Machine  @relation(fields: [machineId], references: [id], onDelete: Cascade)
+  fileId    String // ID z Anthropic Files API
+  filename  String
+  mediaType String
+  kind      String   @default("manual") // manual | hydraulika | elektro | jine
+  isImage   Boolean  @default(false)
+  sizeBytes Int?
+  createdAt DateTime @default(now())
+
+  @@index([machineId])
 }
 
 model LogEntry {
