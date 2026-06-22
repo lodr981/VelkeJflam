@@ -1,0 +1,38 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Machine {
+  id           String     @id @default(cuid())
+  name         String
+  type         String?
+  manufacturer String?
+  year         Int?
+  location     String?
+  photoUrl     String?
+  manualText   String?    @db.Text
+  notes        String?    @db.Text
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  entries      LogEntry[]
+}
+
+model LogEntry {
+  id              String   @id @default(cuid())
+  machineId       String
+  machine         Machine  @relation(fields: [machineId], references: [id], onDelete: Cascade)
+  occurredAt      DateTime @default(now())
+  problem         String   @db.Text
+  solution        String?  @db.Text
+  partsCost       Int?
+  downtimeMinutes Int?
+  technician      String?
+  createdAt       DateTime @default(now())
+
+  @@index([machineId])
+}
