@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
+import BreakdownImport from "./BreakdownImport";
 
 export const dynamic = "force-dynamic";
 
@@ -35,6 +36,8 @@ export default async function HomePage() {
           <code>npm run db:push</code>.
         </div>
       )}
+
+      <BreakdownImport />
 
       {machines && machines.length === 0 && (
         <div className="rounded-xl border border-dashed border-slate-300 bg-white p-8 text-center text-slate-500">

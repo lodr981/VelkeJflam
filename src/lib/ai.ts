@@ -199,7 +199,7 @@ Ukázka řádků: ${JSON.stringify(sampleRows.slice(0, 3))}
 
 Přiřaď NÁZEV sloupce (přesně jak je v "Sloupce") ke každému poli, nebo null když chybí.
 Vrať JSON:
-{"occurredAt": "<sloupec s datem nebo null>", "problem": "<sloupec s popisem závady>", "solution": "<sloupec s řešením/opravou nebo null>", "downtimeMinutes": "<sloupec s prostojem v minutách nebo null>", "technician": "<sloupec s technikem nebo null>"}`,
+{"machine": "<sloupec s názvem stroje nebo null>", "occurredAt": "<sloupec se začátkem/datem poruchy nebo null>", "endDate": "<sloupec s koncem poruchy nebo null>", "problem": "<sloupec s popisem závady>", "solution": "<sloupec s řešením/opravou/údržbou nebo null>", "downtimeMinutes": "<sloupec s prostojem v minutách nebo null>", "technician": "<sloupec s technikem/zadavatelem nebo null>", "cause": "<sloupec s příčinou nebo null>"}`,
       },
     ],
   });
@@ -217,11 +217,14 @@ Vrať JSON:
       return typeof v === "string" && headers.includes(v) ? v : null;
     };
     return {
+      machine: pick("machine"),
       occurredAt: pick("occurredAt"),
+      endDate: pick("endDate"),
       problem: pick("problem"),
       solution: pick("solution"),
       downtimeMinutes: pick("downtimeMinutes"),
       technician: pick("technician"),
+      cause: pick("cause"),
     };
   } catch {
     return null;
