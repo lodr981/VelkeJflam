@@ -105,20 +105,12 @@ export default function EntryForm({ machineId }: { machineId: string }) {
             placeholder="Řešení / co jsem udělal"
             className="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-brand"
           />
-          <div className="grid grid-cols-2 gap-2">
-            <input
-              name="partsCost"
-              type="number"
-              placeholder="Díly (Kč)"
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-brand"
-            />
-            <input
-              name="downtimeMinutes"
-              type="number"
-              placeholder="Prostoj (min)"
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-brand"
-            />
-          </div>
+          <input
+            name="downtimeMinutes"
+            type="number"
+            placeholder="Prostoj (min)"
+            className="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-brand"
+          />
           <input
             name="technician"
             placeholder="Technik (volitelné)"

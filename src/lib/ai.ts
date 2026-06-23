@@ -1,6 +1,7 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import { anthropic, AI_MODEL } from "./anthropic";
 import { FILES_BETA } from "./files";
+import type { FieldMap } from "./importParse";
 import type { Machine, LogEntry } from "@prisma/client";
 
 // Model pro dotazy na schémata/výkresy – Opus 4.8 kvůli high-res vision.
@@ -163,6 +164,53 @@ export async function askMachineAssistant(
   });
 
   return extractAnswer(res.content);
+}
+
+/** Necht AI přiřadí sloupce z importovaného souboru k polím záznamu poruchy. */
+export async function aiColumnMap(
+  headers: string[],
+  sampleRows: Record<string, unknown>[]
+): Promise<FieldMap | null> {
+  const res = await anthropic.messages.create({
+    model: AI_MODEL,
+    max_tokens: 400,
+    system:
+      "Mapuješ sloupce tabulky s historií poruch strojů na pevná pole. Vrať POUZE JSON.",
+    messages: [
+      {
+        role: "user",
+        content: `Sloupce: ${JSON.stringify(headers)}
+Ukázka řádků: ${JSON.stringify(sampleRows.slice(0, 3))}
+
+Přiřaď NÁZEV sloupce (přesně jak je v "Sloupce") ke každému poli, nebo null když chybí.
+Vrať JSON:
+{"occurredAt": "<sloupec s datem nebo null>", "problem": "<sloupec s popisem závady>", "solution": "<sloupec s řešením/opravou nebo null>", "downtimeMinutes": "<sloupec s prostojem v minutách nebo null>", "technician": "<sloupec s technikem nebo null>"}`,
+      },
+    ],
+  });
+
+  const text = res.content
+    .filter((b): b is Anthropic.TextBlock => b.type === "text")
+    .map((b) => b.text)
+    .join("");
+  const match = text.match(/\{[\s\S]*\}/);
+  if (!match) return null;
+  try {
+    const parsed = JSON.parse(match[0]) as Record<string, unknown>;
+    const pick = (k: string) => {
+      const v = parsed[k];
+      return typeof v === "string" && headers.includes(v) ? v : null;
+    };
+    return {
+      occurredAt: pick("occurredAt"),
+      problem: pick("problem"),
+      solution: pick("solution"),
+      downtimeMinutes: pick("downtimeMinutes"),
+      technician: pick("technician"),
+    };
+  } catch {
+    return null;
+  }
 }
 
 /** Z volného (např. hlasem nadiktovaného) textu udělá strukturovaný záznam poruchy. */

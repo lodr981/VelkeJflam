@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import EntryForm from "./EntryForm";
 import Assistant from "./Assistant";
 import Documents from "./Documents";
+import ImportEntries from "./ImportEntries";
 
 export const dynamic = "force-dynamic";
 
@@ -30,8 +31,6 @@ export default async function MachinePage({
 
   if (!machine) notFound();
 
-  const totalCost = machine.entries.reduce((s, e) => s + (e.partsCost ?? 0), 0);
-
   return (
     <div className="space-y-6">
       <Link href="/" className="text-sm text-brand hover:underline">
@@ -47,7 +46,6 @@ export default async function MachinePage({
         </p>
         <div className="mt-3 flex gap-4 text-sm text-slate-600">
           <span>📋 {machine.entries.length} záznamů</span>
-          {totalCost > 0 && <span>💰 {totalCost} Kč za díly celkem</span>}
         </div>
       </div>
 
@@ -70,6 +68,7 @@ export default async function MachinePage({
       <section className="space-y-3">
         <h2 className="text-lg font-semibold">Zapsat poruchu / zásah</h2>
         <EntryForm machineId={machine.id} />
+        <ImportEntries machineId={machine.id} />
       </section>
 
       <section className="space-y-3">
@@ -93,10 +92,11 @@ export default async function MachinePage({
                 {e.solution && (
                   <div className="mt-1 text-sm text-slate-700">✅ {e.solution}</div>
                 )}
-                <div className="mt-2 flex gap-3 text-xs text-slate-500">
-                  {e.partsCost != null && <span>Díly: {e.partsCost} Kč</span>}
-                  {e.downtimeMinutes != null && <span>Prostoj: {e.downtimeMinutes} min</span>}
-                </div>
+                {e.downtimeMinutes != null && (
+                  <div className="mt-2 text-xs text-slate-500">
+                    Prostoj: {e.downtimeMinutes} min
+                  </div>
+                )}
               </li>
             ))}
           </ol>
