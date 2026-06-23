@@ -181,6 +181,78 @@ export async function askMachineAssistant(
   return extractAnswer(res.content);
 }
 
+// ===== Dotaz napříč více stroji (flotila / stejný typ) =====
+
+export type FleetMachine = {
+  name: string;
+  entries: {
+    occurredAt: Date;
+    problem: string;
+    solution: string | null;
+    downtimeMinutes: number | null;
+  }[];
+};
+
+const FLEET_SYSTEM_PROMPT = `Jsi zkušený AI údržbář. Dostaneš historii poruch více strojů STEJNÉHO typu / rodiny najednou.
+
+Pravidla:
+- Odpovídej česky, stručně a prakticky, jako kolega technik.
+- Hledej hlavně VZORY napříč stroji: opakující se a společné závady, časté příčiny, intervaly.
+- Porovnej stroje mezi sebou (který zlobí nejvíc, čím se liší).
+- Z historie odhadni, co tyhle stroje nejčastěji potřebují a co technika nejspíš čeká.
+- Když navrhuješ řešení, vycházej z toho, co u těchto strojů dříve zabralo. U konkrétních kroků buď konkrétní.`;
+
+/** Sloučí historii více strojů do jednoho kontextu pro AI. */
+export function buildFleetContext(machines: FleetMachine[]): string {
+  return machines
+    .map((m) => {
+      const lines =
+        m.entries
+          .map(
+            (e) =>
+              `  ${czDate(e.occurredAt)} | ${e.problem}` +
+              (e.solution ? ` → ${e.solution}` : "") +
+              (e.downtimeMinutes != null ? ` (${e.downtimeMinutes} min)` : "")
+          )
+          .join("\n") || "  (bez záznamů)";
+      return `=== STROJ: ${m.name} (${m.entries.length} záznamů) ===\n${lines}`;
+    })
+    .join("\n\n");
+}
+
+/** Zavolá Claude nad historií více strojů stejného typu. */
+export async function askFleet(
+  machines: FleetMachine[],
+  filter: string,
+  history: { role: "user" | "assistant"; content: string }[],
+  question: string
+): Promise<string> {
+  const context = buildFleetContext(machines);
+  const intro = `Skupina strojů podle filtru „${filter}" — ${machines.length} strojů.\n\n${context}\n\n---\n`;
+  const first = history.length === 0;
+
+  const messages: { role: "user" | "assistant"; content: string }[] = [];
+  if (first) {
+    messages.push({ role: "user", content: `${intro}\nDotaz technika: ${question}` });
+  } else {
+    messages.push({ role: "user", content: `${intro}\n(Navazuje konverzace níže.)` });
+    messages.push({
+      role: "assistant",
+      content: "Rozumím, mám historii všech těchto strojů. Ptej se.",
+    });
+    for (const m of history) messages.push(m);
+    messages.push({ role: "user", content: question });
+  }
+
+  const res = await anthropic.messages.create({
+    model: AI_MODEL,
+    max_tokens: 1500,
+    system: FLEET_SYSTEM_PROMPT,
+    messages,
+  });
+  return extractAnswer(res.content);
+}
+
 /** Necht AI přiřadí sloupce z importovaného souboru k polím záznamu poruchy. */
 export async function aiColumnMap(
   headers: string[],

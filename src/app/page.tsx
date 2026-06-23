@@ -20,14 +20,22 @@ export default async function HomePage() {
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-2">
         <h1 className="text-xl font-bold">Moje stroje</h1>
-        <Link
-          href="/machines/new"
-          className="rounded-lg bg-brand px-3 py-2 text-sm font-medium text-white hover:bg-brand-dark"
-        >
-          + Přidat stroj
-        </Link>
+        <div className="flex gap-2">
+          <Link
+            href="/fleet"
+            className="rounded-lg border border-brand px-3 py-2 text-sm font-medium text-brand hover:bg-teal-50"
+          >
+            🔎 Dotaz napříč stroji
+          </Link>
+          <Link
+            href="/machines/new"
+            className="rounded-lg bg-brand px-3 py-2 text-sm font-medium text-white hover:bg-brand-dark"
+          >
+            + Přidat stroj
+          </Link>
+        </div>
       </div>
 
       {machines === null && (
