@@ -7,6 +7,7 @@ import {
   type FieldMap,
 } from "@/lib/importParse";
 import { aiColumnMap } from "@/lib/ai";
+import { getUploadedFile } from "@/lib/files";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -28,8 +29,8 @@ export async function POST(req: NextRequest) {
         { status: 413 }
       );
     }
-    const file = form.get("file");
-    if (!(file instanceof File)) {
+    const file = getUploadedFile(form.get("file"));
+    if (!file) {
       return NextResponse.json({ error: "Chybí soubor." }, { status: 400 });
     }
     if (!/\.(xlsx|xls|csv)$/i.test(file.name)) {

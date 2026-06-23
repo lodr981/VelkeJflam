@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { uploadToFiles, isImageType } from "@/lib/files";
+import { uploadToFiles, isImageType, getUploadedFile } from "@/lib/files";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -24,10 +24,10 @@ export async function POST(
   }
 
   const form = await req.formData();
-  const file = form.get("file");
+  const file = getUploadedFile(form.get("file"));
   const kind = (form.get("kind") as string) || "manual";
 
-  if (!(file instanceof File)) {
+  if (!file) {
     return NextResponse.json({ error: "Chybí soubor." }, { status: 400 });
   }
   if (!ACCEPTED.includes(file.type)) {
