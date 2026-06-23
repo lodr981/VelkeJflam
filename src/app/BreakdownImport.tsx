@@ -21,9 +21,12 @@ export default function BreakdownImport() {
     const res = await fetch("/api/import/breakdowns", { method: "POST", body: fd });
     setBusy(false);
     e.target.value = "";
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      setError(data.error ?? "Import se nezdařil.");
+    const data = await res.json().catch(() => null);
+    if (!res.ok || !data) {
+      setError(
+        data?.error ??
+          `Import se nezdařil (HTTP ${res.status}). Možná příliš velký soubor nebo timeout.`
+      );
       return;
     }
     setMsg(
