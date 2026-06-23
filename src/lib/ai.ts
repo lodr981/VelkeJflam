@@ -221,7 +221,8 @@ export function aiErrorMessage(err: unknown): string {
     error?: { error?: { message?: string } };
   };
   const status = e?.status;
-  const raw = (e?.error?.error?.message || e?.message || "").toLowerCase();
+  const detail = (e?.error?.error?.message || e?.message || "").slice(0, 300);
+  const raw = detail.toLowerCase();
 
   if (raw.includes("credit") || raw.includes("billing"))
     return "Na účtu Anthropic není kredit. Dobij ho na console.anthropic.com → Billing.";
@@ -231,12 +232,15 @@ export function aiErrorMessage(err: unknown): string {
     return "API klíč nemá oprávnění (403). Zkontroluj klíč i účet.";
   if (status === 429)
     return "Překročen limit požadavků na AI. Zkus to za chvíli.";
-  if (status === 400) return "Neplatný požadavek na AI (400).";
+  if (status === 404)
+    return `AI model nenalezen (404)${detail ? ": " + detail : ""}. Zkontroluj ANTHROPIC_MODEL.`;
+  if (status === 400)
+    return `Neplatný požadavek na AI (400)${detail ? ": " + detail : ""}.`;
   if (status && status >= 500)
     return "AI služba je dočasně přetížená. Zkus to za chvíli.";
   if (!status)
     return "Nelze se připojit k AI (síť). Zkontroluj, že na Railway NENÍ omylem nastavená ANTHROPIC_BASE_URL.";
-  return "AI je momentálně nedostupná.";
+  return `AI je momentálně nedostupná${detail ? ": " + detail : ""}.`;
 }
 
 /** Z volného (např. hlasem nadiktovaného) textu udělá strukturovaný záznam poruchy.
