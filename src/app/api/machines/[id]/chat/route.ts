@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { askMachineAssistant } from "@/lib/ai";
+import { askMachineAssistant, aiErrorMessage } from "@/lib/ai";
 
 export const dynamic = "force-dynamic";
 
@@ -49,9 +49,6 @@ export async function POST(
     return NextResponse.json({ answer });
   } catch (err) {
     console.error("AI chyba:", err);
-    return NextResponse.json(
-      { error: "AI asistent je momentálně nedostupný." },
-      { status: 502 }
-    );
+    return NextResponse.json({ error: aiErrorMessage(err) }, { status: 502 });
   }
 }

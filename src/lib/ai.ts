@@ -213,6 +213,32 @@ Vrať JSON:
   }
 }
 
+/** Přeloží chybu z Anthropic API na srozumitelný důvod pro uživatele. */
+export function aiErrorMessage(err: unknown): string {
+  const e = err as {
+    status?: number;
+    message?: string;
+    error?: { error?: { message?: string } };
+  };
+  const status = e?.status;
+  const raw = (e?.error?.error?.message || e?.message || "").toLowerCase();
+
+  if (raw.includes("credit") || raw.includes("billing"))
+    return "Na účtu Anthropic není kredit. Dobij ho na console.anthropic.com → Billing.";
+  if (status === 401)
+    return "Neplatný API klíč. Zkontroluj ANTHROPIC_API_KEY v Railway (celý sk-ant-…, bez mezer).";
+  if (status === 403)
+    return "API klíč nemá oprávnění (403). Zkontroluj klíč i účet.";
+  if (status === 429)
+    return "Překročen limit požadavků na AI. Zkus to za chvíli.";
+  if (status === 400) return "Neplatný požadavek na AI (400).";
+  if (status && status >= 500)
+    return "AI služba je dočasně přetížená. Zkus to za chvíli.";
+  if (!status)
+    return "Nelze se připojit k AI (síť). Zkontroluj, že na Railway NENÍ omylem nastavená ANTHROPIC_BASE_URL.";
+  return "AI je momentálně nedostupná.";
+}
+
 /** Z volného (např. hlasem nadiktovaného) textu udělá strukturovaný záznam poruchy.
  *  Když AI selže (chybí klíč, kredit, výpadek), vrátí text jako problém – nikdy
  *  nezahodí to, co technik napsal. */
