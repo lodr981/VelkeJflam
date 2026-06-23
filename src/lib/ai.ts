@@ -253,6 +253,46 @@ export async function askFleet(
   return extractAnswer(res.content);
 }
 
+// ===== Analýza celého provozu (nad agregovanými statistikami) =====
+
+const PLANT_SYSTEM_PROMPT = `Jsi AI analytik údržby celého provozu. Dostaneš SOUHRNNÉ STATISTIKY poruch (ne jednotlivé řádky):
+nejporuchovější stroje, stroje s největším prostojem, nejčastější příčiny a vývoj v čase.
+
+Pravidla:
+- Odpovídej česky, konkrétně, manažersky i prakticky.
+- Pomáhej rozhodnout, KAM zaměřit údržbu (princip 80/20): kde je největší prostoj a nejvíc poruch.
+- Upozorni na systémové/opakující se příčiny napříč provozem.
+- Když to dává smysl, navrhni konkrétní kroky (prevence, náhradní díly, kontroly).
+- Pracuj jen s daty, která máš; když něco chybí, řekni to.`;
+
+/** Zavolá Claude nad souhrnnými statistikami celého provozu. */
+export async function askPlant(
+  context: string,
+  history: { role: "user" | "assistant"; content: string }[],
+  question: string
+): Promise<string> {
+  const intro = `Souhrnné statistiky provozu:\n\n${context}\n\n---\n`;
+  const first = history.length === 0;
+
+  const messages: { role: "user" | "assistant"; content: string }[] = [];
+  if (first) {
+    messages.push({ role: "user", content: `${intro}\nDotaz: ${question}` });
+  } else {
+    messages.push({ role: "user", content: `${intro}\n(Navazuje konverzace níže.)` });
+    messages.push({ role: "assistant", content: "Mám statistiky provozu. Ptej se." });
+    for (const m of history) messages.push(m);
+    messages.push({ role: "user", content: question });
+  }
+
+  const res = await anthropic.messages.create({
+    model: AI_MODEL,
+    max_tokens: 1500,
+    system: PLANT_SYSTEM_PROMPT,
+    messages,
+  });
+  return extractAnswer(res.content);
+}
+
 /** Necht AI přiřadí sloupce z importovaného souboru k polím záznamu poruchy. */
 export async function aiColumnMap(
   headers: string[],

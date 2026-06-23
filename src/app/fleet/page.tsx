@@ -16,7 +16,7 @@ export default function FleetPage() {
   async function send(e: React.FormEvent) {
     e.preventDefault();
     const question = input.trim();
-    if (!question || !filter.trim() || loading) return;
+    if (!question || loading) return;
 
     const history = messages.slice(-8);
     const next = [...messages, { role: "user" as const, content: question }];
@@ -24,15 +24,27 @@ export default function FleetPage() {
     setInput("");
     setLoading(true);
 
-    const res = await fetch("/api/fleet/chat", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ filter: filter.trim(), question, history }),
-    });
+    const whole = !filter.trim();
+    const res = await fetch(
+      whole ? "/api/fleet/overview" : "/api/fleet/chat",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(
+          whole
+            ? { question, history }
+            : { filter: filter.trim(), question, history }
+        ),
+      }
+    );
     const data = await res.json().catch(() => ({}));
     setLoading(false);
     if (res.ok) {
-      setInfo(`Zahrnuto ${data.machineCount} strojů podle „${filter.trim()}".`);
+      setInfo(
+        whole
+          ? `Celý provoz: ${data.machines} strojů, ${data.entries} poruch.`
+          : `Zahrnuto ${data.machineCount} strojů podle „${filter.trim()}".`
+      );
     }
     setMessages((m) => [
       ...m,
@@ -54,14 +66,15 @@ export default function FleetPage() {
       <div>
         <h1 className="text-xl font-bold">Dotaz napříč stroji</h1>
         <p className="mt-1 text-sm text-slate-500">
-          Zadej kus názvu (typ/rodina strojů). AI projde historii všech strojů, které
-          filtru odpovídají, a hledá společné vzory.
+          Zadej kus názvu (typ/rodina strojů) a AI hledá společné vzory. Nech filtr{" "}
+          <strong>prázdný</strong> pro analýzu <strong>celého provozu</strong> (nejhorší
+          stroje, nejčastější příčiny, prostoje).
         </p>
       </div>
 
       <div>
         <label className="mb-1 block text-sm font-medium text-slate-700">
-          Filtr názvu strojů
+          Filtr názvu strojů (prázdné = celý provoz)
         </label>
         <input
           value={filter}
@@ -116,7 +129,7 @@ export default function FleetPage() {
         />
         <button
           type="submit"
-          disabled={loading || !input.trim() || !filter.trim()}
+          disabled={loading || !input.trim()}
           className="rounded-lg bg-brand px-4 py-2 font-medium text-white hover:bg-brand-dark disabled:opacity-50"
         >
           Poslat
