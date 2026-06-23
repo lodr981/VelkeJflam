@@ -213,39 +213,47 @@ Vrať JSON:
   }
 }
 
-/** Z volného (např. hlasem nadiktovaného) textu udělá strukturovaný záznam poruchy. */
+/** Z volného (např. hlasem nadiktovaného) textu udělá strukturovaný záznam poruchy.
+ *  Když AI selže (chybí klíč, kredit, výpadek), vrátí text jako problém – nikdy
+ *  nezahodí to, co technik napsal. */
 export async function structureLogEntry(rawText: string): Promise<{
   problem: string;
   solution: string | null;
   partsCost: number | null;
   downtimeMinutes: number | null;
 }> {
-  const res = await anthropic.messages.create({
-    model: AI_MODEL,
-    max_tokens: 512,
-    system:
-      "Z volného popisu zásahu údržbáře vytvoř strukturovaný záznam. Vrať POUZE JSON bez dalšího textu.",
-    messages: [
-      {
-        role: "user",
-        content: `Popis zásahu: "${rawText}"
+  const fallback = {
+    problem: rawText,
+    solution: null,
+    partsCost: null,
+    downtimeMinutes: null,
+  };
+
+  try {
+    const res = await anthropic.messages.create({
+      model: AI_MODEL,
+      max_tokens: 512,
+      system:
+        "Z volného popisu zásahu údržbáře vytvoř strukturovaný záznam. Vrať POUZE JSON bez dalšího textu.",
+      messages: [
+        {
+          role: "user",
+          content: `Popis zásahu: "${rawText}"
 
 Vrať JSON ve tvaru:
 {"problem": "...", "solution": "..." nebo null, "partsCost": číslo v Kč nebo null, "downtimeMinutes": číslo minut nebo null}`,
-      },
-    ],
-  });
+        },
+      ],
+    });
 
-  const text = res.content
-    .filter((b): b is Anthropic.TextBlock => b.type === "text")
-    .map((b) => b.text)
-    .join("");
+    const text = res.content
+      .filter((b): b is Anthropic.TextBlock => b.type === "text")
+      .map((b) => b.text)
+      .join("");
 
-  const match = text.match(/\{[\s\S]*\}/);
-  if (!match) {
-    return { problem: rawText, solution: null, partsCost: null, downtimeMinutes: null };
-  }
-  try {
+    const match = text.match(/\{[\s\S]*\}/);
+    if (!match) return fallback;
+
     const parsed = JSON.parse(match[0]);
     return {
       problem: typeof parsed.problem === "string" ? parsed.problem : rawText,
@@ -255,7 +263,8 @@ Vrať JSON ve tvaru:
         ? parsed.downtimeMinutes
         : null,
     };
-  } catch {
-    return { problem: rawText, solution: null, partsCost: null, downtimeMinutes: null };
+  } catch (err) {
+    console.error("AI strukturování selhalo, ukládám surový text:", err);
+    return fallback;
   }
 }
