@@ -101,25 +101,36 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Vlož všechny záznamy poruch po dávkách (kvůli limitům a paměti).
+    // Vlož záznamy poruch po dávkách; duplicity (stejné extId) se přeskočí
+    // → opakovaný import téhož exportu přidá jen nové poruchy (inkrementálně).
     const data = breakdownRows.map((r) => ({
       machineId: idByName.get(r.machineName)!,
+      extId: r.extId,
       problem: r.problem,
       solution: r.solution,
       downtimeMinutes: r.downtimeMinutes,
       technician: r.technician,
       ...(r.occurredAt ? { occurredAt: r.occurredAt } : {}),
     }));
+    const before = await prisma.logEntry.count();
     const BATCH = 500;
     for (let i = 0; i < data.length; i += BATCH) {
-      await prisma.logEntry.createMany({ data: data.slice(i, i + BATCH) });
+      await prisma.logEntry.createMany({
+        data: data.slice(i, i + BATCH),
+        skipDuplicates: true,
+      });
     }
+    const after = await prisma.logEntry.count();
+    const added = after - before;
 
     return NextResponse.json({
       sheet: picked.sheetName,
       machinesTotal: names.length,
       machinesCreated: createdMachines,
-      entries: data.length,
+      rows: data.length,
+      added,
+      skipped: data.length - added,
+      withId: data.filter((d) => d.extId).length,
       mapping: map,
     });
   } catch (err) {

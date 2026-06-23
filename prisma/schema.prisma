@@ -40,6 +40,7 @@ model Document {
 
 model LogEntry {
   id              String   @id @default(cuid())
+  extId           String?  @unique // ID_REQUE_NUMBE z exportu – pro inkrementální import
   machineId       String
   machine         Machine  @relation(fields: [machineId], references: [id], onDelete: Cascade)
   occurredAt      DateTime @default(now())

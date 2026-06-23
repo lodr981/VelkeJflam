@@ -30,8 +30,12 @@ export default function BreakdownImport() {
       return;
     }
     setMsg(
-      `Hotovo: ${data.entries} poruch na ${data.machinesTotal} strojích ` +
-        `(${data.machinesCreated} nově založeno, list „${data.sheet}").`
+      `Hotovo: přidáno ${data.added} nových poruch` +
+        (data.skipped ? `, přeskočeno ${data.skipped} už existujících` : "") +
+        `. Strojů ${data.machinesTotal} (${data.machinesCreated} nově).` +
+        (data.withId === 0
+          ? " ⚠️ Soubor nemá sloupec s ID požadavku — příště se nepozná duplicita."
+          : "")
     );
     router.refresh();
   }

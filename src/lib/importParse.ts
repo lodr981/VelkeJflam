@@ -1,4 +1,5 @@
 import * as XLSX from "xlsx";
+import { createHash } from "node:crypto";
 
 export type FieldMap = {
   occurredAt?: string | null;
@@ -9,6 +10,7 @@ export type FieldMap = {
   technician?: string | null;
   machine?: string | null;
   cause?: string | null;
+  externalId?: string | null;
 };
 
 export type ParsedSheet = {
@@ -58,6 +60,7 @@ const RX = {
   machine: /n[áa]zev.*stroj|stroj.*n[áa]zev|machine.*name|name.*machine|resource|za[řr][íi]zen[íi]/i,
   machineFallback: /stroj|machine|equip|asset|linka/i,
   cause: /p[řr][íi][čc]in|cause|d[ůu]vod|root/i,
+  externalId: /id_reque|reque.?numb|request.?num|ticket|[čc][íi]slo pozadav|[čc][íi]slo poruch/i,
 };
 
 /** Záložní rozpoznání sloupců podle názvů (když AI není k dispozici). */
@@ -72,6 +75,7 @@ export function heuristicMap(headers: string[]): FieldMap {
     technician: find(RX.technician),
     machine: find(RX.machine) ?? find(RX.machineFallback),
     cause: find(RX.cause),
+    externalId: find(RX.externalId),
   };
 }
 
@@ -207,6 +211,7 @@ export function pickBreakdownSheet(buf: Buffer): PickedSheet | null {
 
 export type BreakdownRow = {
   machineName: string;
+  extId: string | null;
   problem: string;
   solution: string | null;
   downtimeMinutes: number | null;
@@ -238,9 +243,24 @@ export function buildBreakdownRows(
       if (diff > 0 && diff < 60 * 24 * 14) downtime = diff;
     }
 
+    const fullProblem = cause ? `${problem} · příčina: ${cause}` : problem;
+
+    // Otisk pro dedup: primárně ID z exportu, jinak hash (stroj+datum+problém),
+    // ať je opakovaný import idempotentní i pro řádky bez ID.
+    const extIdRaw = map.externalId ? row[map.externalId] : null;
+    const extId =
+      extIdRaw != null && String(extIdRaw).trim() !== ""
+        ? String(extIdRaw).trim()
+        : "h:" +
+          createHash("sha1")
+            .update(`${machineName}|${start ? start.toISOString() : ""}|${fullProblem}`)
+            .digest("hex")
+            .slice(0, 24);
+
     out.push({
       machineName,
-      problem: cause ? `${problem} · příčina: ${cause}` : problem,
+      extId,
+      problem: fullProblem,
       solution: map.solution ? cleanPrefix(row[map.solution]) : null,
       downtimeMinutes: downtime,
       technician: map.technician
