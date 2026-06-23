@@ -97,13 +97,14 @@ function docBlocks(docs: AttachedDoc[]): unknown[] {
 }
 
 /** Z odpovědi vytáhne text a doplní odkaz na strany manuálu (citace). */
-function extractAnswer(content: Anthropic.Beta.BetaContentBlock[]): string {
+function extractAnswer(content: readonly unknown[]): string {
   const parts: string[] = [];
   const pages = new Set<string>();
-  for (const b of content) {
-    if (b.type === "text") {
+  for (const block of content) {
+    const b = block as { type?: string; text?: string; citations?: unknown[] };
+    if (b.type === "text" && b.text) {
       parts.push(b.text);
-      for (const c of (b as { citations?: unknown[] }).citations ?? []) {
+      for (const c of b.citations ?? []) {
         const cit = c as {
           type?: string;
           start_page_number?: number;
@@ -154,15 +155,29 @@ export async function askMachineAssistant(
     messages.push({ role: "user", content: question });
   }
 
-  const res = await anthropic.beta.messages.create({
-    model: pickModel(question, docs),
+  const model = pickModel(question, docs);
+
+  // S dokumenty jdeme přes Files API (beta), bez dokumentů normálním endpointem
+  // (prázdná hlavička anthropic-beta jinak vrací 400).
+  if (docs.length) {
+    const res = await anthropic.beta.messages.create({
+      model,
+      max_tokens: 1024,
+      system: SYSTEM_PROMPT,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      messages: messages as any,
+      betas: [FILES_BETA],
+    });
+    return extractAnswer(res.content);
+  }
+
+  const res = await anthropic.messages.create({
+    model,
     max_tokens: 1024,
     system: SYSTEM_PROMPT,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     messages: messages as any,
-    betas: docs.length ? [FILES_BETA] : [],
   });
-
   return extractAnswer(res.content);
 }
 
