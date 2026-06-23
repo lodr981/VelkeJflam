@@ -14,22 +14,37 @@ export const maxDuration = 300;
 const MAX_BYTES = 25 * 1024 * 1024; // 25 MB
 
 export async function POST(req: NextRequest) {
-  const form = await req.formData();
-  const file = form.get("file");
-  if (!(file instanceof File)) {
-    return NextResponse.json({ error: "Chybí soubor." }, { status: 400 });
-  }
-  if (!/\.(xlsx|xls|csv)$/i.test(file.name)) {
-    return NextResponse.json(
-      { error: "Povolené formáty: .xlsx, .xls, .csv" },
-      { status: 400 }
-    );
-  }
-  if (file.size > MAX_BYTES) {
-    return NextResponse.json({ error: "Soubor je větší než 25 MB." }, { status: 400 });
-  }
-
   try {
+    let form: FormData;
+    try {
+      form = await req.formData();
+    } catch (e) {
+      console.error("formData selhalo:", e);
+      return NextResponse.json(
+        {
+          error:
+            "Soubor se nepodařilo nahrát (nejspíš příliš velký upload). Zkus nahrát jen list Databaze jako menší .xlsx.",
+        },
+        { status: 413 }
+      );
+    }
+    const file = form.get("file");
+    if (!(file instanceof File)) {
+      return NextResponse.json({ error: "Chybí soubor." }, { status: 400 });
+    }
+    if (!/\.(xlsx|xls|csv)$/i.test(file.name)) {
+      return NextResponse.json(
+        { error: "Povolené formáty: .xlsx, .xls, .csv" },
+        { status: 400 }
+      );
+    }
+    if (file.size > MAX_BYTES) {
+      return NextResponse.json(
+        { error: "Soubor je větší než 25 MB." },
+        { status: 400 }
+      );
+    }
+
     const buf = Buffer.from(await file.arrayBuffer());
     const picked = pickBreakdownSheet(buf);
     if (!picked) {
