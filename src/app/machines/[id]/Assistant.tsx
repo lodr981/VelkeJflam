@@ -15,6 +15,7 @@ export default function Assistant({
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
+  const [deep, setDeep] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
 
   async function send(e: React.FormEvent) {
@@ -31,7 +32,7 @@ export default function Assistant({
     const res = await fetch(`/api/machines/${machineId}/chat`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ question, history }),
+      body: JSON.stringify({ question, history, deep }),
     });
     const data = await res.json().catch(() => ({}));
     setLoading(false);
@@ -115,6 +116,15 @@ export default function Assistant({
               Poslat
             </button>
           </form>
+
+          <label className="flex items-center gap-2 text-xs text-slate-500">
+            <input
+              type="checkbox"
+              checked={deep}
+              onChange={(e) => setDeep(e.target.checked)}
+            />
+            🔍 Mrkni přímo do schématu (přesnější trasování, o pár haléřů dražší)
+          </label>
         </div>
       )}
     </div>

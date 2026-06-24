@@ -38,8 +38,16 @@ export async function POST(
     : [];
 
   try {
-    const answer = await askMachineAssistant(machine, history, question);
-    return NextResponse.json({ answer });
+    // Režim "mrkni do schématu": přiloží originály schémat (hydraulika/elektro/obrázky).
+    const deep = body?.deep === true;
+    const attach = deep
+      ? machine.documents
+          .filter((d) => d.isImage || d.kind === "hydraulika" || d.kind === "elektro")
+          .slice(0, 4)
+          .map((d) => ({ fileId: d.fileId, isImage: d.isImage }))
+      : [];
+    const answer = await askMachineAssistant(machine, history, question, attach);
+    return NextResponse.json({ answer, lookedAtSchema: attach.length });
   } catch (err) {
     console.error("AI chyba:", err);
     return NextResponse.json({ error: aiErrorMessage(err) }, { status: 502 });

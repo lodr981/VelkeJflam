@@ -179,15 +179,46 @@ function extractAnswer(content: readonly unknown[]): string {
   return answer;
 }
 
-/** Zavolá Claude a vrátí odpověď AI údržbáře (nad výtažky z dokumentace – levně). */
+/** Zavolá Claude a vrátí odpověď AI údržbáře (nad výtažky z dokumentace – levně).
+ *  Když `attach` obsahuje schémata, přiloží JEJICH ORIGINÁL (vizuální dohledání ve výkresu). */
 export async function askMachineAssistant(
   machine: MachineForAI,
   history: { role: "user" | "assistant"; content: string }[],
-  question: string
+  question: string,
+  attach: { fileId: string; isImage: boolean }[] = []
 ): Promise<string> {
   const context = buildMachineContext(machine);
   const intro = `Kontext o stroji:\n\n${context}\n\n---\n`;
   const first = history.length === 0;
+
+  // Režim "mrkni do schématu": přiložíme originál výkresu a necháme AI vizuálně trasovat.
+  if (attach.length) {
+    const blocks: unknown[] = attach.map((a) =>
+      a.isImage
+        ? { type: "image", source: { type: "file", file_id: a.fileId } }
+        : { type: "document", source: { type: "file", file_id: a.fileId } }
+    );
+    const firstText = first
+      ? `${intro}\nDíváš se na přiložené schéma. Dotaz technika: ${question}`
+      : `${intro}\n(Navazuje konverzace, přiloženo schéma.)`;
+    const messages: unknown[] = [
+      { role: "user", content: [...blocks, { type: "text", text: firstText }] },
+    ];
+    if (!first) {
+      messages.push({ role: "assistant", content: "Vidím schéma i historii. Ptej se." });
+      for (const m of history) messages.push({ role: m.role, content: m.content });
+      messages.push({ role: "user", content: question });
+    }
+    const res = await anthropic.beta.messages.create({
+      model: SCHEMA_MODEL,
+      max_tokens: 1024,
+      system: SYSTEM_PROMPT,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      messages: messages as any,
+      betas: [FILES_BETA],
+    });
+    return extractAnswer(res.content);
+  }
 
   const messages: { role: "user" | "assistant"; content: string }[] = [];
   if (first) {
