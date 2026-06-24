@@ -79,7 +79,8 @@ Pravidla:
 - Když navrhuješ řešení, dej konkrétní kroky (postup), ne obecné fráze.
 - Pokud něco z historie nevíš, řekni to a navrhni, co změřit/zkontrolovat.
 - U bezpečnostně rizikových úkonů (elektro, tlak, zdvih) připomeň zásady bezpečnosti.
-- Když dává smysl, upozorni na to, "co technika nejspíš čeká" (prediktivní tip podle historie).`;
+- Když dává smysl, upozorni na to, "co technika nejspíš čeká" (prediktivní tip podle historie).
+- Když má stroj v dokumentaci SCHÉMA (diagnostickou mapu) a technik popíše příznak (např. "nejde motor"), urči podle mapy KONKRÉTNÍ prvky ke kontrole – stykač, měnič, pojistky, snímače – uveď jejich označení a navrhni pořadí kontroly. Když to ze schématu nejde určit jednoznačně, řekni to.`;
 
 export type AttachedDoc = {
   fileId: string;
@@ -116,12 +117,16 @@ export async function distillDocument(
     : { type: "document", source: { type: "file", file_id: fileId } };
 
   const prompt = isImage
-    ? `Toto je technické schéma (${KIND_LABEL[kind] ?? "schéma"}) „${filename}". Popiš ho pro údržbáře:
-- typ schématu,
-- hlavní komponenty a jejich OZNAČENÍ (ventily, relé, motory, snímače, jističe, válce…),
-- klíčové uzly a co kde je,
-- seznam komponent s označením.
-Česky, věcně, přehledně.`
+    ? `Toto je technické schéma (${KIND_LABEL[kind] ?? "schéma"}) „${filename}". Vytvoř z něj DIAGNOSTICKOU MAPU pro údržbáře, ať podle příznaku najde prvky ke kontrole:
+
+1) Seznam hlavních prvků s OZNAČENÍM přesně dle schématu: motory/pohony, stykače, měniče (frekvenční měniče), pojistky/jističe, relé, ventily, snímače/koncáky.
+
+2) Pro KAŽDÝ motor / pohon / ventil napiš, čím je NAPÁJEN, ŘÍZEN a JIŠTĚN — tj. které stykače ho spínají, který měnič ho řídí, které pojistky/jističe ho jistí, jaké snímače se ho týkají.
+   Formát: "Motor M3 (pohon X): stykač K5, měnič U2, pojistky F12–F14, snímač B7".
+
+3) Klíčové ovládací/jisticí prvky a co ovládají.
+
+Označení uváděj přesně. Co nejde z výkresu vyčíst, napiš že to ze schématu nelze určit. Česky, přehledně.`
     : `Toto je manuál „${filename}". Vytáhni POUZE to důležité pro údržbu, stručně v bodech, česky:
 - základní parametry stroje,
 - údržbové intervaly a úkony,
