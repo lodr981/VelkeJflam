@@ -33,6 +33,7 @@ model Document {
   kind      String   @default("manual") // manual | hydraulika | elektro | jine
   isImage   Boolean  @default(false)
   sizeBytes Int?
+  digest    String?  @db.Text // výtažek toho důležitého (předpřipravený při nahrání)
   createdAt DateTime @default(now())
 
   @@index([machineId])

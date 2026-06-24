@@ -61,6 +61,7 @@ export default async function MachinePage({
             kind: d.kind,
             isImage: d.isImage,
             sizeBytes: d.sizeBytes,
+            processed: !!d.digest,
           }))}
         />
       </section>

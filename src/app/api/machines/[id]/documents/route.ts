@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { uploadToFiles, isImageType, getUploadedFile } from "@/lib/files";
+import { distillDocument } from "@/lib/ai";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 60;
+export const maxDuration = 120;
 
 const ACCEPTED = [
   "application/pdf",
@@ -56,6 +57,12 @@ export async function POST(
     );
   }
 
+  const isImage = isImageType(file.type);
+
+  // Přečteme dokument JEDNOU a uložíme jen výtažek toho důležitého.
+  // Dotazy pak jedou nad výtažkem (levně), originál drží Files API pro případ potřeby.
+  const digest = await distillDocument(fileId, isImage, file.name, kind);
+
   const doc = await prisma.document.create({
     data: {
       machineId: params.id,
@@ -63,8 +70,9 @@ export async function POST(
       filename: file.name,
       mediaType: file.type,
       kind,
-      isImage: isImageType(file.type),
+      isImage,
       sizeBytes: file.size,
+      digest,
     },
   });
 

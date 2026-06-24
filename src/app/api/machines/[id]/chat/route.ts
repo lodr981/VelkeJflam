@@ -25,13 +25,6 @@ export async function POST(
     return NextResponse.json({ error: "Stroj nenalezen." }, { status: 404 });
   }
 
-  const docs = machine.documents.map((d) => ({
-    fileId: d.fileId,
-    filename: d.filename,
-    kind: d.kind,
-    isImage: d.isImage,
-  }));
-
   const history = Array.isArray(body.history)
     ? body.history
         .filter(
@@ -45,7 +38,7 @@ export async function POST(
     : [];
 
   try {
-    const answer = await askMachineAssistant(machine, history, question, docs);
+    const answer = await askMachineAssistant(machine, history, question);
     return NextResponse.json({ answer });
   } catch (err) {
     console.error("AI chyba:", err);

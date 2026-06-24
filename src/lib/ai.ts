@@ -7,13 +7,21 @@ import type { Machine, LogEntry } from "@prisma/client";
 // Model pro dotazy na schémata/výkresy – Opus 4.8 kvůli high-res vision.
 const SCHEMA_MODEL = process.env.ANTHROPIC_SCHEMA_MODEL ?? "claude-opus-4-8";
 
-type MachineForAI = Machine & { entries: LogEntry[] };
+type DocForAI = { filename: string; kind: string; isImage: boolean; digest: string | null };
+type MachineForAI = Machine & { entries: LogEntry[]; documents?: DocForAI[] };
 
 function czDate(d: Date): string {
   return new Date(d).toLocaleDateString("cs-CZ");
 }
 
-/** Sestaví kontext o stroji pro AI ze životopisu (historie poruch + manuál). */
+const KIND_LABEL: Record<string, string> = {
+  manual: "Manuál",
+  hydraulika: "Hydraulické schéma",
+  elektro: "Elektro schéma",
+  jine: "Dokument",
+};
+
+/** Sestaví kontext o stroji pro AI ze životopisu (historie poruch + výtažky z dokumentace). */
 export function buildMachineContext(machine: MachineForAI): string {
   const head = [
     `Stroj: ${machine.name}`,
@@ -46,10 +54,20 @@ export function buildMachineContext(machine: MachineForAI): string {
           .join("\n\n");
 
   const manual = machine.manualText
-    ? `\n\n=== VÝŇATEK Z MANUÁLU / DOKUMENTACE ===\n${machine.manualText.slice(0, 12000)}`
+    ? `\n\n=== POZNÁMKY K DOKUMENTACI ===\n${machine.manualText.slice(0, 12000)}`
     : "";
 
-  return `=== PROFIL STROJE ===\n${head}\n\n=== ŽIVOTOPIS / HISTORIE PORUCH (od nejnovější) ===\n${history}${manual}`;
+  const digests = (machine.documents ?? []).filter((d) => d.digest);
+  const docSection = digests.length
+    ? "\n\n=== DOKUMENTACE (výtažky toho důležitého) ===\n" +
+      digests
+        .map(
+          (d) => `--- ${KIND_LABEL[d.kind] ?? "Dokument"}: ${d.filename} ---\n${d.digest}`
+        )
+        .join("\n\n")
+    : "";
+
+  return `=== PROFIL STROJE ===\n${head}\n\n=== ŽIVOTOPIS / HISTORIE PORUCH (od nejnovější) ===\n${history}${manual}${docSection}`;
 }
 
 const SYSTEM_PROMPT = `Jsi zkušený AI údržbář. Pomáháš technikovi přímo u stroje.
@@ -73,8 +91,11 @@ export type AttachedDoc = {
 const SCHEMA_KEYWORDS =
   /(sch[ée]ma|sch[ée]mat|hydraul|elektro|v[ýy]kres|ventil|rel[ée]|zapojen|svork|st[ýy]kac|jisti|p[ií]stnic|rozvad|zna[čc]k)/i;
 
-/** Vybere model: dotaz na výkres/schéma → Opus 4.8 (high-res vision), jinak výchozí. */
-export function pickModel(question: string, docs: AttachedDoc[]): string {
+/** Vybere model: dotaz na výkres/schéma → Opus 4.8 (lepší reasoning), jinak výchozí. */
+export function pickModel(
+  question: string,
+  docs: { kind: string; isImage: boolean }[]
+): string {
   const hasSchema = docs.some(
     (d) => d.isImage || d.kind === "hydraulika" || d.kind === "elektro"
   );
@@ -82,18 +103,48 @@ export function pickModel(question: string, docs: AttachedDoc[]): string {
   return AI_MODEL;
 }
 
-/** Připraví obrázky/PDF jako bloky pro zprávu (PDF s citacemi, obrázky jako vision). */
-function docBlocks(docs: AttachedDoc[]): unknown[] {
-  return docs.map((d) =>
-    d.isImage
-      ? { type: "image", source: { type: "file", file_id: d.fileId } }
-      : {
-          type: "document",
-          source: { type: "file", file_id: d.fileId },
-          title: d.filename,
-          citations: { enabled: true },
-        }
-  );
+/** Přečte dokument (PDF/obrázek) JEDNOU přes Files API a vytáhne jen to důležité.
+ *  Výsledek (výtažek) se uloží a dotazy pak jedou nad ním – levně. */
+export async function distillDocument(
+  fileId: string,
+  isImage: boolean,
+  filename: string,
+  kind: string
+): Promise<string | null> {
+  const block = isImage
+    ? { type: "image", source: { type: "file", file_id: fileId } }
+    : { type: "document", source: { type: "file", file_id: fileId } };
+
+  const prompt = isImage
+    ? `Toto je technické schéma (${KIND_LABEL[kind] ?? "schéma"}) „${filename}". Popiš ho pro údržbáře:
+- typ schématu,
+- hlavní komponenty a jejich OZNAČENÍ (ventily, relé, motory, snímače, jističe, válce…),
+- klíčové uzly a co kde je,
+- seznam komponent s označením.
+Česky, věcně, přehledně.`
+    : `Toto je manuál „${filename}". Vytáhni POUZE to důležité pro údržbu, stručně v bodech, česky:
+- základní parametry stroje,
+- údržbové intervaly a úkony,
+- časté závady a jejich řešení,
+- chybové/poruchové kódy a co znamenají,
+- klíčové náhradní díly a jejich čísla,
+- bezpečnostní upozornění,
+- důležité postupy (seřízení, výměny).
+Vynech marketing a obecné fráze.`;
+
+  try {
+    const res = await anthropic.beta.messages.create({
+      model: isImage ? SCHEMA_MODEL : AI_MODEL,
+      max_tokens: 2000,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      messages: [{ role: "user", content: [block, { type: "text", text: prompt }] as any }],
+      betas: [FILES_BETA],
+    });
+    return extractAnswer(res.content) || null;
+  } catch (err) {
+    console.error("Destilace dokumentu selhala:", err);
+    return null;
+  }
 }
 
 /** Z odpovědi vytáhne text a doplní odkaz na strany manuálu (citace). */
@@ -123,60 +174,34 @@ function extractAnswer(content: readonly unknown[]): string {
   return answer;
 }
 
-/** Zavolá Claude a vrátí textovou odpověď AI údržbáře (s manuály a schématy). */
+/** Zavolá Claude a vrátí odpověď AI údržbáře (nad výtažky z dokumentace – levně). */
 export async function askMachineAssistant(
   machine: MachineForAI,
   history: { role: "user" | "assistant"; content: string }[],
-  question: string,
-  docs: AttachedDoc[] = []
+  question: string
 ): Promise<string> {
   const context = buildMachineContext(machine);
   const intro = `Kontext o stroji:\n\n${context}\n\n---\n`;
   const first = history.length === 0;
 
-  // První zpráva nese dokumentaci (manuály/schémata) + textový kontext.
-  const firstContent: unknown[] = [
-    ...docBlocks(docs),
-    {
-      type: "text",
-      text: first
-        ? `${intro}\nDotaz technika: ${question}`
-        : `${intro}\n(Navazuje konverzace níže.)`,
-    },
-  ];
-
-  const messages: unknown[] = [{ role: "user", content: firstContent }];
-  if (!first) {
+  const messages: { role: "user" | "assistant"; content: string }[] = [];
+  if (first) {
+    messages.push({ role: "user", content: `${intro}\nDotaz technika: ${question}` });
+  } else {
+    messages.push({ role: "user", content: `${intro}\n(Navazuje konverzace níže.)` });
     messages.push({
       role: "assistant",
       content: "Rozumím, mám parametry, historii i dokumentaci stroje. Ptej se.",
     });
-    for (const m of history) messages.push({ role: m.role, content: m.content });
+    for (const m of history) messages.push(m);
     messages.push({ role: "user", content: question });
   }
 
-  const model = pickModel(question, docs);
-
-  // S dokumenty jdeme přes Files API (beta), bez dokumentů normálním endpointem
-  // (prázdná hlavička anthropic-beta jinak vrací 400).
-  if (docs.length) {
-    const res = await anthropic.beta.messages.create({
-      model,
-      max_tokens: 1024,
-      system: SYSTEM_PROMPT,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      messages: messages as any,
-      betas: [FILES_BETA],
-    });
-    return extractAnswer(res.content);
-  }
-
   const res = await anthropic.messages.create({
-    model,
+    model: pickModel(question, machine.documents ?? []),
     max_tokens: 1024,
     system: SYSTEM_PROMPT,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    messages: messages as any,
+    messages,
   });
   return extractAnswer(res.content);
 }

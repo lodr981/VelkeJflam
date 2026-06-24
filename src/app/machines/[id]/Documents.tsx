@@ -9,6 +9,7 @@ export type DocDTO = {
   kind: string;
   isImage: boolean;
   sizeBytes: number | null;
+  processed: boolean;
 };
 
 const KIND_LABEL: Record<string, string> = {
@@ -104,6 +105,11 @@ export default function Documents({
             >
               <span className="truncate">
                 {KIND_LABEL[d.kind] ?? "📎"} {d.filename}
+                {d.processed ? (
+                  <span className="ml-1 text-xs text-green-600">✓ zpracováno</span>
+                ) : (
+                  <span className="ml-1 text-xs text-amber-600">(bez výtažku)</span>
+                )}
               </span>
               <button
                 onClick={() => onDelete(d.id)}
