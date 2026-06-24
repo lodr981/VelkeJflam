@@ -109,7 +109,8 @@ export async function POST(req: NextRequest) {
       problem: r.problem,
       solution: r.solution,
       downtimeMinutes: r.downtimeMinutes,
-      technician: r.technician,
+      reporter: r.reporter,
+      repairer: r.repairer,
       ...(r.occurredAt ? { occurredAt: r.occurredAt } : {}),
     }));
     const before = await prisma.logEntry.count();

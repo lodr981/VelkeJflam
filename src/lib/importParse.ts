@@ -146,6 +146,13 @@ export function cleanPrefix(value: unknown): string | null {
   return out || null;
 }
 
+/** Z buňky vytáhne kód operátora v závorce (např. "(OP001525)" → "OP001525"). */
+export function extractOperator(value: unknown): string | null {
+  if (value == null) return null;
+  const m = String(value).match(/\(([A-Za-z0-9_]+)\)\s*:/);
+  return m ? m[1].trim() : null;
+}
+
 /** Parsuje datum i s časem (Date, dd/mm/rrrr hh:mm:ss, dd.mm.rrrr, ISO). */
 export function parseDateTime(value: unknown): Date | null {
   if (value == null || value === "") return null;
@@ -215,7 +222,8 @@ export type BreakdownRow = {
   problem: string;
   solution: string | null;
   downtimeMinutes: number | null;
-  technician: string | null;
+  reporter: string | null;
+  repairer: string | null;
   occurredAt?: Date;
 };
 
@@ -263,9 +271,10 @@ export function buildBreakdownRows(
       problem: fullProblem,
       solution: map.solution ? cleanPrefix(row[map.solution]) : null,
       downtimeMinutes: downtime,
-      technician: map.technician
+      reporter: map.technician
         ? String(row[map.technician] ?? "").trim() || null
         : null,
+      repairer: map.solution ? extractOperator(row[map.solution]) : null,
       ...(start ? { occurredAt: start } : {}),
     });
   }

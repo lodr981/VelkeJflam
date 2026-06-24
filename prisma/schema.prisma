@@ -49,7 +49,10 @@ model LogEntry {
   partsCost       Int?
   downtimeMinutes Int?
   technician      String?
+  reporter        String? // kdo nahlásil (Zadavatel)
+  repairer        String? // kdo opravil (kód operátora z údržbového záznamu)
   createdAt       DateTime @default(now())
 
   @@index([machineId])
+  @@index([repairer])
 }

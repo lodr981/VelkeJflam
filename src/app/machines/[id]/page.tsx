@@ -86,6 +86,8 @@ export default async function MachinePage({
               >
                 <div className="mb-1 text-xs text-slate-400">
                   {czDateTime(e.occurredAt)}
+                  {e.repairer ? ` · 🔧 opravil: ${e.repairer}` : ""}
+                  {e.reporter ? ` · nahlásil: ${e.reporter}` : ""}
                   {e.technician ? ` · ${e.technician}` : ""}
                 </div>
                 <div className="font-medium text-slate-900">⚠️ {e.problem}</div>

@@ -22,7 +22,13 @@ export default async function HomePage() {
     <div className="space-y-5">
       <div className="flex items-center justify-between gap-2">
         <h1 className="text-xl font-bold">Moje stroje</h1>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
+          <Link
+            href="/search"
+            className="rounded-lg border border-brand px-3 py-2 text-sm font-medium text-brand hover:bg-teal-50"
+          >
+            🔍 Hledat
+          </Link>
           <Link
             href="/fleet"
             className="rounded-lg border border-brand px-3 py-2 text-sm font-medium text-brand hover:bg-teal-50"
