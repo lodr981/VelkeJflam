@@ -22,7 +22,8 @@ export default function AutoAssignLines() {
       .map(([l, c]) => `${l}: ${c}`)
       .join(", ");
     setMsg(
-      `Přiřazeno ${parts || "0"}. Bez linky zůstalo ${data.leftNull}.`
+      `Přiřazeno (${parts || "0"}). Vyřazeno ${data.retired} (A6/BR223). ` +
+        `Bez linky zůstalo ${data.leftNull}.`
     );
     router.refresh();
   }
@@ -30,15 +31,15 @@ export default function AutoAssignLines() {
   return (
     <div className="rounded-xl border border-dashed border-slate-300 bg-white p-4">
       <p className="mb-2 text-sm text-slate-500">
-        Přiřadí linku z názvu strojů (SEAU, L663, UKL, Vstřikovna UAP1). Nepřepisuje
-        ručně nastavené.
+        Přiřadí linku z názvu strojů (SEAU, L663, UKL, Vstřikovna UAP1) a vyřadí mrtvé
+        linky (A6, BR223). Ručně nastavené nepřepisuje.
       </p>
       <button
         onClick={run}
         disabled={busy}
         className="rounded-lg bg-brand px-3 py-2 text-sm font-medium text-white hover:bg-brand-dark disabled:opacity-50"
       >
-        {busy ? "Přiřazuji…" : "🏭 Auto‑přiřadit linky z názvů"}
+        {busy ? "Zpracovávám…" : "🏭 Auto‑roztřídit (linky + vyřadit A6/BR223)"}
       </button>
       {msg && <p className="mt-2 text-sm text-green-700">✅ {msg}</p>}
     </div>

@@ -3,7 +3,13 @@ import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
 
-/** Odvodí linku z názvu stroje (podle linek: SEAU, L663, UKL, Vstřikovna UAP1). */
+/** Mrtvé linky, které se už neprovozují → vyřadit. */
+function isDeadLine(name: string): boolean {
+  const n = name.toLowerCase();
+  return /\ba6\b/.test(n) || /br223/.test(n);
+}
+
+/** Odvodí linku z názvu stroje (SEAU, L663, UKL, Vstřikovna UAP1). */
 function lineFromName(name: string): string | null {
   const n = name.toLowerCase();
   if (/l663/.test(n)) return "L663";
@@ -15,28 +21,38 @@ function lineFromName(name: string): string | null {
 }
 
 export async function POST() {
-  // Pouze stroje BEZ linky (ruční přiřazení nepřepisujeme).
   const machines = await prisma.machine.findMany({
-    where: { line: null },
-    select: { id: true, name: true },
+    select: { id: true, name: true, line: true, retired: true },
   });
 
-  const counts: Record<string, number> = {};
+  const assigned: Record<string, number> = {};
+  let retiredCount = 0;
   let leftNull = 0;
 
   for (const m of machines) {
-    const line = lineFromName(m.name);
-    if (line) {
-      await prisma.machine.update({ where: { id: m.id }, data: { line } });
-      counts[line] = (counts[line] ?? 0) + 1;
-    } else {
-      leftNull++;
+    // Mrtvé linky (A6, BR223) → vyřadit.
+    if (isDeadLine(m.name)) {
+      if (!m.retired) {
+        await prisma.machine.update({ where: { id: m.id }, data: { retired: true } });
+        retiredCount++;
+      }
+      continue;
+    }
+    // Ostatní: doplnit linku, pokud ještě nemá (ruční nepřepisujeme).
+    if (m.line == null) {
+      const line = lineFromName(m.name);
+      if (line) {
+        await prisma.machine.update({ where: { id: m.id }, data: { line } });
+        assigned[line] = (assigned[line] ?? 0) + 1;
+      } else {
+        leftNull++;
+      }
     }
   }
 
   return NextResponse.json({
-    processed: machines.length,
-    assigned: counts,
+    assigned,
+    retired: retiredCount,
     leftNull,
   });
 }
