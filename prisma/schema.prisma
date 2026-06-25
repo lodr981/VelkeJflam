@@ -10,6 +10,8 @@ datasource db {
 model Machine {
   id           String     @id @default(cuid())
   name         String
+  line         String? // výrobní linka (pro seskupení); null = bez linky
+  retired      Boolean    @default(false) // vyřazený stroj – všude se ignoruje
   type         String?
   manufacturer String?
   year         Int?

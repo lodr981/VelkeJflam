@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
   }
 
   const machines = await prisma.machine.findMany({
-    where: { name: { contains: filter, mode: "insensitive" } },
+    where: { retired: false, name: { contains: filter, mode: "insensitive" } },
     take: MAX_MACHINES,
     orderBy: { name: "asc" },
     include: {

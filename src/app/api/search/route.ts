@@ -16,7 +16,10 @@ export async function POST(req: NextRequest) {
   const machineWhere = q || machine;
   const machines = machineWhere
     ? await prisma.machine.findMany({
-        where: { name: { contains: machineWhere, mode: "insensitive" } },
+        where: {
+          retired: false,
+          name: { contains: machineWhere, mode: "insensitive" },
+        },
         select: {
           id: true,
           name: true,
@@ -29,7 +32,7 @@ export async function POST(req: NextRequest) {
 
   // Poruchy odpovídající textu (v popisu, řešení nebo podle opraváře),
   // volitelně omezené na stroj.
-  const andFilters: object[] = [];
+  const andFilters: object[] = [{ machine: { retired: false } }];
   if (q) {
     andFilters.push({
       OR: [

@@ -11,12 +11,14 @@ function czMonth(d: Date): string {
 
 /** Sestaví souhrnné statistiky celého provozu pro AI. */
 async function buildPlantContext(): Promise<{ context: string; totals: Record<string, number> }> {
-  const [machines, entries] = await Promise.all([
-    prisma.machine.findMany({ select: { id: true, name: true } }),
-    prisma.logEntry.findMany({
-      select: { machineId: true, problem: true, downtimeMinutes: true, occurredAt: true },
-    }),
-  ]);
+  const machines = await prisma.machine.findMany({
+    where: { retired: false },
+    select: { id: true, name: true },
+  });
+  const entries = await prisma.logEntry.findMany({
+    where: { machineId: { in: machines.map((m) => m.id) } },
+    select: { machineId: true, problem: true, downtimeMinutes: true, occurredAt: true },
+  });
 
   const nameById = new Map(machines.map((m) => [m.id, m.name]));
   const perMachine = new Map<string, { count: number; downtime: number }>();

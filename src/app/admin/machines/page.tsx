@@ -11,8 +11,8 @@ export default async function AdminMachinesPage({
   const q = (searchParams.q ?? "").trim();
   const machines = await prisma.machine.findMany({
     where: q ? { name: { contains: q, mode: "insensitive" } } : {},
-    orderBy: { name: "asc" },
-    take: 100,
+    orderBy: [{ retired: "asc" }, { line: "asc" }, { name: "asc" }],
+    take: 200,
     include: { _count: { select: { documents: true } } },
   });
 
@@ -40,11 +40,23 @@ export default async function AdminMachinesPage({
           <li key={m.id}>
             <Link
               href={`/admin/machines/${m.id}`}
-              className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm hover:border-brand"
+              className={`flex items-center justify-between rounded-lg border px-3 py-2 text-sm hover:border-brand ${
+                m.retired ? "border-red-200 bg-red-50" : "border-slate-200 bg-white"
+              }`}
             >
-              <span>{m.name}</span>
-              <span className="text-xs text-slate-400">
-                {m._count.documents} dok. · spravovat →
+              <span className="truncate">
+                {m.name}
+                {m.line && (
+                  <span className="ml-2 rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-500">
+                    {m.line}
+                  </span>
+                )}
+                {m.retired && (
+                  <span className="ml-2 text-xs font-medium text-red-600">vyřazený</span>
+                )}
+              </span>
+              <span className="ml-2 shrink-0 text-xs text-slate-400">
+                {m._count.documents} dok. →
               </span>
             </Link>
           </li>

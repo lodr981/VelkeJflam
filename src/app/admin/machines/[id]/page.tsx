@@ -6,6 +6,7 @@ import { baseUrl } from "@/lib/baseUrl";
 import Documents from "@/app/machines/[id]/Documents";
 import ImportEntries from "@/app/machines/[id]/ImportEntries";
 import PrintButton from "./PrintButton";
+import MachineSettings from "./MachineSettings";
 
 export const dynamic = "force-dynamic";
 
@@ -34,6 +35,15 @@ export default async function AdminMachinePage({
           Otevřít provozní stránku →
         </Link>
       </div>
+
+      <section className="space-y-3">
+        <h2 className="text-lg font-semibold">Nastavení stroje</h2>
+        <MachineSettings
+          machineId={machine.id}
+          line={machine.line}
+          retired={machine.retired}
+        />
+      </section>
 
       <section className="space-y-3">
         <h2 className="text-lg font-semibold">Dokumentace</h2>
