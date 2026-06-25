@@ -42,7 +42,11 @@ export async function POST(
     const deep = body?.deep === true;
     const attach = deep
       ? machine.documents
-          .filter((d) => d.isImage || d.kind === "hydraulika" || d.kind === "elektro")
+          .filter(
+            (d): d is typeof d & { fileId: string } =>
+              !!d.fileId &&
+              (d.isImage || d.kind === "hydraulika" || d.kind === "elektro")
+          )
           .slice(0, 4)
           .map((d) => ({ fileId: d.fileId, isImage: d.isImage }))
       : [];

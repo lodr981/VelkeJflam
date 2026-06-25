@@ -16,6 +16,7 @@ const KIND_LABEL: Record<string, string> = {
   manual: "📘 Manuál",
   hydraulika: "🛢️ Hydraulika",
   elektro: "⚡ Elektro",
+  plc: "🔌 PLC program",
   jine: "📎 Jiné",
 };
 
@@ -82,20 +83,23 @@ export default function Documents({
               <option value="manual">📘 Manuál</option>
               <option value="hydraulika">🛢️ Hydraulika</option>
               <option value="elektro">⚡ Elektro schéma</option>
+              <option value="plc">🔌 PLC program (SCL/STL/XML)</option>
               <option value="jine">📎 Jiné</option>
             </select>
 
             <label className="cursor-pointer rounded-lg bg-brand px-3 py-2 text-sm font-medium text-white hover:bg-brand-dark">
-              {uploading ? "Nahrávám…" : "+ Nahrát soubor"}
+              {uploading ? "Zpracovávám…" : "+ Nahrát soubor"}
               <input
                 type="file"
-                accept=".pdf,.png,.jpg,.jpeg,.webp,.gif"
+                accept=".pdf,.png,.jpg,.jpeg,.webp,.gif,.scl,.stl,.awl,.st,.xml,.txt,.l5x,.exp"
                 onChange={onUpload}
                 disabled={uploading}
                 className="hidden"
               />
             </label>
-            <span className="text-xs text-slate-400">PDF / obrázek, max 32 MB</span>
+            <span className="text-xs text-slate-400">
+              PDF / obrázek / PLC source, max 32 MB
+            </span>
           </div>
 
           {error && <p className="mt-2 text-sm text-red-600">{error}</p>}

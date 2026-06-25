@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { uploadToFiles, isImageType, getUploadedFile } from "@/lib/files";
-import { distillDocument } from "@/lib/ai";
+import { distillDocument, distillTextDocument } from "@/lib/ai";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 120;
+export const maxDuration = 180;
 
 const ACCEPTED = [
   "application/pdf",
@@ -13,7 +13,9 @@ const ACCEPTED = [
   "image/webp",
   "image/gif",
 ];
-const MAX_BYTES = 32 * 1024 * 1024; // 32 MB (limit Files API pro PDF v dotazu)
+// Textový source (PLC SCL/STL/XML…) – zpracuje se bez Files API.
+const TEXT_EXT = /\.(scl|awl|stl|st|txt|xml|l5x|exp|csv|json)$/i;
+const MAX_BYTES = 32 * 1024 * 1024; // 32 MB
 
 export async function POST(
   req: NextRequest,
@@ -31,21 +33,40 @@ export async function POST(
   if (!file) {
     return NextResponse.json({ error: "Chybí soubor." }, { status: 400 });
   }
-  if (!ACCEPTED.includes(file.type)) {
+
+  const isText = TEXT_EXT.test(file.name) && !ACCEPTED.includes(file.type);
+  if (!isText && !ACCEPTED.includes(file.type)) {
     return NextResponse.json(
-      { error: "Povolené formáty: PDF, PNG, JPG, WEBP, GIF." },
+      { error: "Povolené formáty: PDF, obrázek, nebo PLC source (.scl/.stl/.awl/.xml/.txt)." },
       { status: 400 }
     );
   }
   if (file.size > MAX_BYTES) {
-    return NextResponse.json(
-      { error: "Soubor je větší než 32 MB." },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: "Soubor je větší než 32 MB." }, { status: 400 });
   }
 
-  const buffer = Buffer.from(await file.arrayBuffer());
+  // Textový source (PLC SCL/STL/XML…) – bez Files API: rovnou destilace nad textem.
+  if (isText) {
+    const text = Buffer.from(await file.arrayBuffer()).toString("utf8");
+    const digest = await distillTextDocument(text, file.name, kind);
+    const doc = await prisma.document.create({
+      data: {
+        machineId: params.id,
+        fileId: null,
+        filename: file.name,
+        mediaType: file.type || "text/plain",
+        kind,
+        isImage: false,
+        sizeBytes: file.size,
+        rawText: text.slice(0, 1_000_000),
+        digest,
+      },
+    });
+    return NextResponse.json(doc, { status: 201 });
+  }
 
+  // PDF / obrázek → Files API + destilace.
+  const buffer = Buffer.from(await file.arrayBuffer());
   let fileId: string;
   try {
     fileId = await uploadToFiles(buffer, file.name, file.type);
@@ -58,9 +79,6 @@ export async function POST(
   }
 
   const isImage = isImageType(file.type);
-
-  // Přečteme dokument JEDNOU a uložíme jen výtažek toho důležitého.
-  // Dotazy pak jedou nad výtažkem (levně), originál drží Files API pro případ potřeby.
   const digest = await distillDocument(fileId, isImage, file.name, kind);
 
   const doc = await prisma.document.create({

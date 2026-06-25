@@ -18,6 +18,7 @@ const KIND_LABEL: Record<string, string> = {
   manual: "Manuál",
   hydraulika: "Hydraulické schéma",
   elektro: "Elektro schéma",
+  plc: "PLC program (diagnostická mapa)",
   jine: "Dokument",
 };
 
@@ -80,7 +81,7 @@ Pravidla:
 - Pokud něco z historie nevíš, řekni to a navrhni, co změřit/zkontrolovat.
 - U bezpečnostně rizikových úkonů (elektro, tlak, zdvih) připomeň zásady bezpečnosti.
 - Když dává smysl, upozorni na to, "co technika nejspíš čeká" (prediktivní tip podle historie).
-- Když má stroj v dokumentaci SCHÉMA (diagnostickou mapu) a technik popíše příznak (např. "nejde motor"), urči podle mapy KONKRÉTNÍ prvky ke kontrole – stykač, měnič, pojistky, snímače – uveď jejich označení a navrhni pořadí kontroly. Když to ze schématu nejde určit jednoznačně, řekni to.`;
+- Když má stroj v dokumentaci SCHÉMA nebo PLC DIAGNOSTICKOU MAPU a technik popíše příznak (např. "nejde motor", "nejde hnout horním stolem"), urči podle mapy KONKRÉTNÍ prvky/podmínky ke kontrole – stykač, měnič, pojistky, snímače, vstupy a zámky z PLC – uveď jejich označení a navrhni pořadí kontroly. Když to nejde určit jednoznačně, řekni to.`;
 
 export type AttachedDoc = {
   fileId: string;
@@ -352,6 +353,46 @@ export async function askPlant(
     messages,
   });
   return extractAnswer(res.content);
+}
+
+/** Destilace TEXTOVÉHO source (PLC SCL/STL/XML, textový manuál) – bez Files API.
+ *  U PLC vytvoří diagnostickou (podmínkovou) mapu pro offline diagnostiku. */
+export async function distillTextDocument(
+  text: string,
+  filename: string,
+  kind: string
+): Promise<string | null> {
+  const MAX = 240000; // ~60k tokenů; větší source ořízneme
+  const truncated = text.length > MAX;
+  const body = truncated ? text.slice(0, MAX) : text;
+
+  const prompt =
+    kind === "plc"
+      ? `Toto je zdrojový kód PLC programu (Siemens S7 – SCL/STL/AWL/XML), soubor „${filename}". Vytvoř z něj DIAGNOSTICKOU MAPU pro údržbáře (offline):
+
+1) Pro každý důležitý VÝSTUP / pohyb (motor, ventil, topení, posuv, stůl) napiš, jaké PODMÍNKY musí platit, aby sepnul — vstupy, koncáky, zámky, "ready", potvrzení, časovače.
+   Formát: "Pohyb horního stolu (Q...): vyžaduje I... (dveře zavřené), I... (koncák dole), M... (ready měniče), NE porucha F...".
+2) Vyjmenuj klíčové ZÁMKY a bezpečnostní podmínky a co blokují.
+3) Pokud je to z kódu zjevné, upozorni na kandidáty na NEOŠETŘENÉ STAVY / chybějící čekání.
+
+Používej OZNAČENÍ a symboly přesně podle kódu (a komentáře, pokud jsou). Co nejde z kódu určit, napiš. Česky, přehledně.${
+          truncated ? "\n\n(Pozn.: source byl dlouhý a oříznutý – uveď, že mapa nemusí být úplná.)" : ""
+        }`
+      : `Toto je textový dokument „${filename}". Vytáhni jen to důležité pro údržbu (parametry, intervaly, časté závady a řešení, chybové kódy, díly, bezpečnost, postupy). Česky, v bodech.`;
+
+  try {
+    const res = await anthropic.messages.create({
+      model: AI_MODEL,
+      max_tokens: 3000,
+      system:
+        "Jsi PLC/údržbářský expert. Z dodaného textu vytvoříš stručný, věcný výtažek pro diagnostiku.",
+      messages: [{ role: "user", content: `${prompt}\n\n=== SOURCE ===\n${body}` }],
+    });
+    return extractAnswer(res.content) || null;
+  } catch (err) {
+    console.error("Destilace textu selhala:", err);
+    return null;
+  }
 }
 
 /** Necht AI přiřadí sloupce z importovaného souboru k polím záznamu poruchy. */

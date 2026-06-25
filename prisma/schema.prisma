@@ -29,12 +29,13 @@ model Document {
   id        String   @id @default(cuid())
   machineId String
   machine   Machine  @relation(fields: [machineId], references: [id], onDelete: Cascade)
-  fileId    String // ID z Anthropic Files API
+  fileId    String? // ID z Anthropic Files API (u textového source je null)
   filename  String
   mediaType String
-  kind      String   @default("manual") // manual | hydraulika | elektro | jine
+  kind      String   @default("manual") // manual | hydraulika | elektro | plc | jine
   isImage   Boolean  @default(false)
   sizeBytes Int?
+  rawText   String?  @db.Text // textový source (PLC SCL/STL/XML…)
   digest    String?  @db.Text // výtažek toho důležitého (předpřipravený při nahrání)
   createdAt DateTime @default(now())
 
