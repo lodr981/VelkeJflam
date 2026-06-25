@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
+import AutoAssignLines from "./AutoAssignLines";
 
 export const dynamic = "force-dynamic";
 
@@ -47,6 +48,7 @@ export default async function AdminPage() {
           title="🛠️ Správa strojů a dokumentace"
           desc="Nahrávání manuálů a schémat ke strojům, QR kódy na tisk."
         />
+        <AutoAssignLines />
       </div>
 
       <p className="text-xs text-slate-400">
