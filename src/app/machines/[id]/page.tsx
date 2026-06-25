@@ -4,7 +4,6 @@ import { prisma } from "@/lib/prisma";
 import EntryForm from "./EntryForm";
 import Assistant from "./Assistant";
 import Documents from "./Documents";
-import ImportEntries from "./ImportEntries";
 
 export const dynamic = "force-dynamic";
 
@@ -55,6 +54,7 @@ export default async function MachinePage({
         <h2 className="text-lg font-semibold">Dokumentace (manuály a schémata)</h2>
         <Documents
           machineId={machine.id}
+          readOnly
           docs={machine.documents.map((d) => ({
             id: d.id,
             filename: d.filename,
@@ -69,7 +69,6 @@ export default async function MachinePage({
       <section className="space-y-3">
         <h2 className="text-lg font-semibold">Zapsat poruchu / zásah</h2>
         <EntryForm machineId={machine.id} />
-        <ImportEntries machineId={machine.id} />
       </section>
 
       <section className="space-y-3">

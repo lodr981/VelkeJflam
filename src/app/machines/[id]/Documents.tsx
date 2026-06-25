@@ -22,9 +22,11 @@ const KIND_LABEL: Record<string, string> = {
 export default function Documents({
   machineId,
   docs,
+  readOnly = false,
 }: {
   machineId: string;
   docs: DocDTO[];
+  readOnly?: boolean;
 }) {
   const router = useRouter();
   const [kind, setKind] = useState("manual");
@@ -64,37 +66,45 @@ export default function Documents({
 
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-      <p className="mb-2 text-sm text-slate-500">
-        Nahraj manuál (PDF) nebo schéma (PDF/obrázek). AI je bude číst a radit podle nich
-        — u manuálů odkáže i na stranu.
-      </p>
+      {!readOnly && (
+        <>
+          <p className="mb-2 text-sm text-slate-500">
+            Nahraj manuál (PDF) nebo schéma (PDF/obrázek). AI je bude číst a radit podle
+            nich — u manuálů odkáže i na stranu.
+          </p>
 
-      <div className="flex flex-wrap items-center gap-2">
-        <select
-          value={kind}
-          onChange={(e) => setKind(e.target.value)}
-          className="rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-brand"
-        >
-          <option value="manual">📘 Manuál</option>
-          <option value="hydraulika">🛢️ Hydraulika</option>
-          <option value="elektro">⚡ Elektro schéma</option>
-          <option value="jine">📎 Jiné</option>
-        </select>
+          <div className="flex flex-wrap items-center gap-2">
+            <select
+              value={kind}
+              onChange={(e) => setKind(e.target.value)}
+              className="rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-brand"
+            >
+              <option value="manual">📘 Manuál</option>
+              <option value="hydraulika">🛢️ Hydraulika</option>
+              <option value="elektro">⚡ Elektro schéma</option>
+              <option value="jine">📎 Jiné</option>
+            </select>
 
-        <label className="cursor-pointer rounded-lg bg-brand px-3 py-2 text-sm font-medium text-white hover:bg-brand-dark">
-          {uploading ? "Nahrávám…" : "+ Nahrát soubor"}
-          <input
-            type="file"
-            accept=".pdf,.png,.jpg,.jpeg,.webp,.gif"
-            onChange={onUpload}
-            disabled={uploading}
-            className="hidden"
-          />
-        </label>
-        <span className="text-xs text-slate-400">PDF / obrázek, max 32 MB</span>
-      </div>
+            <label className="cursor-pointer rounded-lg bg-brand px-3 py-2 text-sm font-medium text-white hover:bg-brand-dark">
+              {uploading ? "Nahrávám…" : "+ Nahrát soubor"}
+              <input
+                type="file"
+                accept=".pdf,.png,.jpg,.jpeg,.webp,.gif"
+                onChange={onUpload}
+                disabled={uploading}
+                className="hidden"
+              />
+            </label>
+            <span className="text-xs text-slate-400">PDF / obrázek, max 32 MB</span>
+          </div>
 
-      {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
+          {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
+        </>
+      )}
+
+      {readOnly && docs.length === 0 && (
+        <p className="text-sm text-slate-500">Zatím žádná dokumentace.</p>
+      )}
 
       {docs.length > 0 && (
         <ul className="mt-3 space-y-2">
@@ -111,12 +121,14 @@ export default function Documents({
                   <span className="ml-1 text-xs text-amber-600">(bez výtažku)</span>
                 )}
               </span>
-              <button
-                onClick={() => onDelete(d.id)}
-                className="ml-2 shrink-0 text-xs text-red-500 hover:underline"
-              >
-                Smazat
-              </button>
+              {!readOnly && (
+                <button
+                  onClick={() => onDelete(d.id)}
+                  className="ml-2 shrink-0 text-xs text-red-500 hover:underline"
+                >
+                  Smazat
+                </button>
+              )}
             </li>
           ))}
         </ul>

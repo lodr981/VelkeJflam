@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
-import BreakdownImport from "./BreakdownImport";
 
 export const dynamic = "force-dynamic";
 
@@ -22,26 +21,37 @@ export default async function HomePage() {
     <div className="space-y-5">
       <div className="flex items-center justify-between gap-2">
         <h1 className="text-xl font-bold">Moje stroje</h1>
-        <div className="flex flex-wrap gap-2">
-          <Link
-            href="/search"
-            className="rounded-lg border border-brand px-3 py-2 text-sm font-medium text-brand hover:bg-teal-50"
-          >
-            🔍 Hledat
-          </Link>
-          <Link
-            href="/fleet"
-            className="rounded-lg border border-brand px-3 py-2 text-sm font-medium text-brand hover:bg-teal-50"
-          >
-            🔎 Dotaz napříč stroji
-          </Link>
-          <Link
-            href="/machines/new"
-            className="rounded-lg bg-brand px-3 py-2 text-sm font-medium text-white hover:bg-brand-dark"
-          >
-            + Přidat stroj
-          </Link>
-        </div>
+        <Link href="/admin" className="text-sm text-slate-400 hover:text-brand">
+          ⚙️ Admin
+        </Link>
+      </div>
+
+      <Link
+        href="/scan"
+        className="flex items-center justify-center gap-2 rounded-xl bg-brand px-4 py-4 text-lg font-semibold text-white shadow hover:bg-brand-dark"
+      >
+        📷 Načíst QR kód stroje
+      </Link>
+
+      <div className="flex flex-wrap gap-2">
+        <Link
+          href="/search"
+          className="rounded-lg border border-brand px-3 py-2 text-sm font-medium text-brand hover:bg-teal-50"
+        >
+          🔍 Hledat
+        </Link>
+        <Link
+          href="/fleet"
+          className="rounded-lg border border-brand px-3 py-2 text-sm font-medium text-brand hover:bg-teal-50"
+        >
+          🔎 Dotaz napříč stroji
+        </Link>
+        <Link
+          href="/machines/new"
+          className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-600 hover:border-brand"
+        >
+          + Přidat stroj
+        </Link>
       </div>
 
       {machines === null && (
@@ -50,8 +60,6 @@ export default async function HomePage() {
           <code>npm run db:push</code>.
         </div>
       )}
-
-      <BreakdownImport />
 
       {machines && machines.length === 0 && (
         <div className="rounded-xl border border-dashed border-slate-300 bg-white p-8 text-center text-slate-500">
