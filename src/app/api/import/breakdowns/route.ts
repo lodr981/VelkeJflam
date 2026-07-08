@@ -59,6 +59,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Sloupce přiřadí AI; když selže, použije se heuristika.
+    const heur = heuristicMap(picked.headers);
     let map: FieldMap | null = null;
     try {
       map = await aiColumnMap(picked.headers, picked.rows.slice(0, 5));
@@ -68,6 +69,9 @@ export async function POST(req: NextRequest) {
     if (!map || !map.machine || !map.problem) {
       map = heuristicMap(picked.headers);
     }
+    // ID sloupec (pro dedup) určujeme VŽDY deterministicky heuristikou,
+    // ať je otisk stejný napříč importy (AI je nedeterministická).
+    map.externalId = heur.externalId ?? map.externalId ?? null;
 
     const breakdownRows = buildBreakdownRows(picked.rows, map);
     if (breakdownRows.length === 0) {
