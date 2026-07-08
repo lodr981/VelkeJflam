@@ -67,6 +67,12 @@ export default async function HomePage() {
           🔎 Dotaz napříč stroji
         </Link>
         <Link
+          href="/report"
+          className="rounded-lg border border-brand px-3 py-2 text-sm font-medium text-brand hover:bg-teal-50"
+        >
+          📅 Souhrn dní
+        </Link>
+        <Link
           href="/machines/new"
           className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-600 hover:border-brand"
         >
