@@ -1,6 +1,7 @@
 import Link from "next/link";
-import { categoryReport, type CatAgg } from "@/lib/faultCategory";
+import { categoryReport, distinctLines, type CatAgg } from "@/lib/faultCategory";
 import { squarify } from "@/lib/treemap";
+import AiSummary from "./AiSummary";
 
 export const dynamic = "force-dynamic";
 
@@ -8,12 +9,21 @@ const H = 62.5; // výška treemapu v % (16:10)
 const hrs = (m: number) => Math.round(m / 60);
 const pct = (x: number) => Math.round(x * 100);
 
+function qs(params: Record<string, string | undefined>): string {
+  const p = new URLSearchParams();
+  for (const [k, v] of Object.entries(params)) if (v) p.set(k, v);
+  const s = p.toString();
+  return s ? `?${s}` : "";
+}
+
 export default async function KategoriePage({
   searchParams,
 }: {
-  searchParams: { cat?: string };
+  searchParams: { cat?: string; line?: string };
 }) {
-  const r = await categoryReport();
+  const lines = await distinctLines();
+  const line = searchParams.line && lines.includes(searchParams.line) ? searchParams.line : null;
+  const r = await categoryReport(line);
   if (r.totalCount === 0) {
     return (
       <div className="space-y-4">
@@ -38,6 +48,22 @@ export default async function KategoriePage({
         </p>
       </div>
 
+      {lines.length > 0 && (
+        <div className="flex flex-wrap gap-1 text-xs">
+          <FilterChip label="Celý závod" href={`/kategorie${qs({ cat: selected?.key })}`} active={!line} />
+          {lines.map((l) => (
+            <FilterChip
+              key={l}
+              label={`🏭 ${l}`}
+              href={`/kategorie${qs({ cat: selected?.key, line: l })}`}
+              active={line === l}
+            />
+          ))}
+        </div>
+      )}
+
+      <AiSummary line={line} />
+
       {/* TREEMAP */}
       <div
         className="relative w-full overflow-hidden rounded-2xl bg-slate-900 shadow-lg"
@@ -51,7 +77,7 @@ export default async function KategoriePage({
           return (
             <Link
               key={c.key}
-              href={active ? "/kategorie" : `/kategorie?cat=${c.key}`}
+              href={`/kategorie${qs({ cat: active ? undefined : c.key, line: line ?? undefined })}`}
               className="group absolute flex flex-col justify-between overflow-hidden p-2 transition"
               style={{
                 left: `${t.x}%`,
@@ -89,7 +115,7 @@ export default async function KategoriePage({
       </div>
 
       {selected ? (
-        <Detail cat={selected} monthsAxis={r.monthsAxis} />
+        <Detail cat={selected} monthsAxis={r.monthsAxis} line={line} />
       ) : (
         <>
           <p className="text-center text-xs text-slate-400">
@@ -97,12 +123,25 @@ export default async function KategoriePage({
           </p>
           <div className="grid gap-3 sm:grid-cols-2">
             {r.cats.map((c) => (
-              <CatCard key={c.key} cat={c} />
+              <CatCard key={c.key} cat={c} line={line} />
             ))}
           </div>
         </>
       )}
     </div>
+  );
+}
+
+function FilterChip({ label, href, active }: { label: string; href: string; active: boolean }) {
+  return (
+    <Link
+      href={href}
+      className={`rounded-full px-3 py-1.5 font-medium ${
+        active ? "bg-brand text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+      }`}
+    >
+      {label}
+    </Link>
   );
 }
 
@@ -119,10 +158,10 @@ function Back() {
   );
 }
 
-function CatCard({ cat }: { cat: CatAgg }) {
+function CatCard({ cat, line }: { cat: CatAgg; line: string | null }) {
   return (
     <Link
-      href={`/kategorie?cat=${cat.key}`}
+      href={`/kategorie${qs({ cat: cat.key, line: line ?? undefined })}`}
       className="block rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:shadow-md"
       style={{ borderLeft: `5px solid ${cat.color}` }}
     >
@@ -148,7 +187,15 @@ function CatCard({ cat }: { cat: CatAgg }) {
   );
 }
 
-function Detail({ cat, monthsAxis }: { cat: CatAgg; monthsAxis: string[] }) {
+function Detail({
+  cat,
+  monthsAxis,
+  line,
+}: {
+  cat: CatAgg;
+  monthsAxis: string[];
+  line: string | null;
+}) {
   const trend = trendLabel(cat.monthly);
   return (
     <div className="space-y-4">
@@ -190,7 +237,7 @@ function Detail({ cat, monthsAxis }: { cat: CatAgg; monthsAxis: string[] }) {
       </section>
 
       <Link
-        href="/kategorie"
+        href={`/kategorie${qs({ line: line ?? undefined })}`}
         className="inline-block rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-600 hover:border-brand"
       >
         ← Všechny kategorie

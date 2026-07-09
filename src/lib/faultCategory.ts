@@ -142,9 +142,27 @@ export type CategoryReport = {
   cats: CatAgg[];
 };
 
-export async function categoryReport(): Promise<CategoryReport> {
+/** Seznam linek, které mají alespoň jeden nevyřazený stroj (pro filtr). */
+export async function distinctLines(): Promise<string[]> {
+  const machines = await prisma.machine.findMany({
+    where: { retired: false, line: { not: null } },
+    select: { line: true },
+    distinct: ["line"],
+  });
+  return machines
+    .map((m) => m.line!.trim())
+    .filter(Boolean)
+    .sort((a, b) => a.localeCompare(b, "cs"));
+}
+
+export async function categoryReport(line?: string | null): Promise<CategoryReport> {
   const rows = await prisma.logEntry.findMany({
-    where: { machine: { retired: false } },
+    where: {
+      machine: {
+        retired: false,
+        ...(line ? { line: { equals: line, mode: "insensitive" } } : {}),
+      },
+    },
     select: {
       problem: true,
       downtimeMinutes: true,
@@ -204,4 +222,36 @@ export async function categoryReport(): Promise<CategoryReport> {
   cats.sort((a, b) => b.downtime - a.downtime);
 
   return { totalCount: rows.length, totalDowntime, monthsAxis, cats };
+}
+
+/** Kompaktní textový kontext kategorií pro AI shrnutí. */
+export function categoryToContext(r: CategoryReport, line?: string | null): string {
+  const hrs = (m: number) => Math.round(m / 60);
+  const trend = (monthly: number[]) => {
+    if (monthly.length < 4) return "";
+    const mid = Math.floor(monthly.length / 2);
+    const a = monthly.slice(0, mid).reduce((s, x) => s + x, 0) / mid;
+    const b = monthly.slice(mid).reduce((s, x) => s + x, 0) / (monthly.length - mid);
+    if (a === 0) return " (nové)";
+    const d = Math.round(((b - a) / a) * 100);
+    if (d > 15) return ` (trend: roste ${d} %)`;
+    if (d < -15) return ` (trend: klesá ${d} %)`;
+    return " (trend: stabilní)";
+  };
+  const lines = [
+    line ? `Filtr linky: ${line}` : "Celý závod (bez vyřazených strojů)",
+    `Poruch: ${r.totalCount} · prostoj: ${hrs(r.totalDowntime)} h`,
+    "",
+    "=== KATEGORIE ZÁVAD (dle prostoje) ===",
+    ...r.cats.map(
+      (c) =>
+        `${c.label}: ${hrs(c.downtime)} h, ${c.count}× (${Math.round(c.share * 100)} %)${trend(
+          c.monthly
+        )} — nejvíc: ${c.machines
+          .slice(0, 3)
+          .map((m) => `${m.name} (${hrs(m.downtime)} h)`)
+          .join(", ")}`
+    ),
+  ];
+  return lines.join("\n");
 }
